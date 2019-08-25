@@ -1,0 +1,16 @@
+POST http://localhost:8080/signup
+
+{
+    "email": "555",
+    "password": "321"
+}
+####
+POST http://localhost:8080/login
+
+{
+    "email": "555",
+    "password": "321"
+}
+
+#### protected
+GET http://localhost:8080/protected
