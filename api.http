@@ -14,3 +14,4 @@ POST http://localhost:8080/login
 
 #### protected
 GET http://localhost:8080/protected
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IjU1NSIsImlzcyI6ImNvdXJzZSJ9.-RRHtPussaQrpRtQOgZIwTQ31u-5-Bq-eV866U4L3AU

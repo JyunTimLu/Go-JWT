@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
@@ -133,18 +134,12 @@ func generateToken(user User) (string, error) {
 func login(w http.ResponseWriter, r *http.Request) {
 
 	var user User
-	// var jwt JWT
+	var jwt JWT
 	var error Error
 
 	json.NewDecoder(r.Body).Decode(&user)
 
-	// token, err := generateToken(user)
-
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// password := user.Password
+	password := user.Password
 
 	row := db.QueryRow("select * from users where email=$1", user.Email)
 	err := row.Scan(&user.ID, &user.Email, &user.Password)
@@ -159,7 +154,24 @@ func login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	spew.Dump(user)
+	hashdPassword := user.Password
+	err = bcrypt.CompareHashAndPassword([]byte(hashdPassword), []byte(password))
+
+	if err != nil {
+		error.Message = "Invalid Password"
+		reponsedWithError(w, http.StatusUnauthorized, error)
+		return
+	}
+
+	token, err := generateToken(user)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	jwt.Token = token
+	responseJSON(w, jwt)
 
 }
 
@@ -169,5 +181,40 @@ func protectedEndPoint(w http.ResponseWriter, r *http.Request) {
 
 func TokenVerifyMiddleWare(next http.HandlerFunc) http.HandlerFunc {
 	fmt.Println("TokenVerifyMiddleWar invoked.")
-	return nil
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var errorObject Error
+		authHeader := r.Header.Get("Authorization")
+
+		bearerToken := strings.Split(authHeader, " ")
+
+		// fmt.Println(bearerToken)
+		if len(bearerToken) == 2 {
+			authToken := bearerToken[1]
+
+			token, error := jwt.Parse(authToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("There was an error")
+				}
+				return []byte("secret"), nil
+			})
+
+			if error != nil {
+				errorObject.Message = error.Error()
+				reponsedWithError(w, http.StatusUnauthorized, errorObject)
+				return
+			}
+
+			if token.Valid {
+				next.ServeHTTP(w, r)
+			} else {
+				errorObject.Message = error.Error()
+				reponsedWithError(w, http.StatusUnauthorized, errorObject)
+				return
+			}
+		} else {
+			errorObject.Message = "Invalid token"
+			reponsedWithError(w, http.StatusUnauthorized, errorObject)
+		}
+
+	})
 }
